@@ -110,4 +110,26 @@ async function mailRecordatorio({ gerente, pedido, token }) {
   });
 }
 
-module.exports = { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado, mailRecordatorio };
+async function mailPedidoEditado({ gerente, pedido, token }) {
+  const link = `${FRONTEND}/aprobar/${token}`;
+  await transporter.sendMail({
+    from: `Sistema de Vacaciones <${FROM}>`,
+    to: gerente.email,
+    subject: `Pedido modificado — ${pedido.empleado_nombre}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto">
+        <h2 style="color:#ca8a04">Pedido de vacaciones modificado</h2>
+        <p>Hola <strong>${gerente.nombre}</strong>, <strong>${pedido.empleado_nombre}</strong> modificó su pedido de vacaciones. Las nuevas fechas son:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;background:#FEF9EE;font-weight:bold">Desde</td><td style="padding:8px">${formatFecha(pedido.fecha_inicio)}</td></tr>
+          <tr><td style="padding:8px;background:#FEF9EE;font-weight:bold">Hasta</td><td style="padding:8px">${formatFecha(pedido.fecha_fin)}</td></tr>
+          <tr><td style="padding:8px;background:#FEF9EE;font-weight:bold">Días hábiles</td><td style="padding:8px">${pedido.dias_habiles}</td></tr>
+          ${pedido.comentario_empleado ? `<tr><td style="padding:8px;background:#FEF9EE;font-weight:bold">Comentario</td><td style="padding:8px">${pedido.comentario_empleado}</td></tr>` : ''}
+        </table>
+        <a href="${link}" style="display:inline-block;background:#1E3A5F;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">Ver y resolver pedido</a>
+      </div>
+    `
+  });
+}
+
+module.exports = { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado, mailRecordatorio, mailPedidoEditado };
