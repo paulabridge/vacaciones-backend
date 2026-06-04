@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const crypto = require('crypto');
 const { calcularDiasHabiles } = require('../services/diasHabiles');
-const { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado } = require('../services/mails');
+const { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado, mailPedidoEditado } = require('../services/mails');
 const { authMiddleware } = require('../middleware/auth');
 
 // Crear pedido (sin login)
@@ -154,3 +154,87 @@ router.post('/:id/resolver', async (req, res) => {
 });
 
 module.exports = router;
+
+// Ver pedidos por mail del empleado (sin login)
+router.post('/mis-pedidos', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email requerido' });
+  try {
+    const { rows } = await pool.query(`
+      SELECT p.*, e.nombre as empresa_nombre, e.color as empresa_color, g.nombre as gerente_nombre
+      FROM pedidos p
+      JOIN empresas e ON p.empresa_id = e.id
+      JOIN gerentes g ON p.gerente_id = g.id
+      WHERE p.empleado_email = $1
+      ORDER BY p.created_at DESC
+    `, [email]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener pedidos' });
+  }
+});
+
+// Editar pedido (solo si está pendiente o a_revisar)
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { empleado_email, fecha_inicio, fecha_fin, comentario_empleado, empresa_id, gerente_id } = req.body;
+  try {
+    // Verificar que el pedido pertenece al empleado y es editable
+    const { rows: check } = await pool.query(
+      `SELECT * FROM pedidos WHERE id = $1 AND empleado_email = $2`,
+      [id, empleado_email]
+    );
+    if (!check.length) return res.status(404).json({ error: 'Pedido no encontrado' });
+    if (!['pendiente', 'a_revisar'].includes(check[0].estado)) {
+      return res.status(400).json({ error: 'Solo podés editar pedidos pendientes o a revisar' });
+    }
+    if (new Date(fecha_fin) < new Date(fecha_inicio)) {
+      return res.status(400).json({ error: 'La fecha de fin no puede ser anterior a la de inicio' });
+    }
+
+    const dias_habiles = await calcularDiasHabiles(fecha_inicio, fecha_fin);
+
+    const { rows } = await pool.query(`
+      UPDATE pedidos SET
+        fecha_inicio = $1, fecha_fin = $2, comentario_empleado = $3,
+        empresa_id = $4, gerente_id = $5, dias_habiles = $6,
+        estado = 'pendiente', comentario_gerente = NULL, resuelto_at = NULL,
+        recordatorios_enviados = 0, ultimo_recordatorio = NULL
+      WHERE id = $7 AND empleado_email = $8
+      RETURNING *
+    `, [fecha_inicio, fecha_fin, comentario_empleado || null, empresa_id, gerente_id, dias_habiles, id, empleado_email]);
+
+    const pedido = rows[0];
+    const empresa = await pool.query('SELECT nombre FROM empresas WHERE id=$1', [empresa_id]);
+    const gerente = await pool.query('SELECT nombre, email FROM gerentes WHERE id=$1', [gerente_id]);
+    pedido.empresa_nombre = empresa.rows[0]?.nombre;
+
+    mailPedidoEditado({ gerente: gerente.rows[0], pedido, token: pedido.token_aprobacion }).catch(console.error);
+
+    res.json({ ok: true, dias_habiles });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al editar pedido' });
+  }
+});
+
+// Cancelar pedido (solo si está pendiente o a_revisar)
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { empleado_email } = req.body;
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM pedidos WHERE id = $1 AND empleado_email = $2`,
+      [id, empleado_email]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Pedido no encontrado' });
+    if (!['pendiente', 'a_revisar'].includes(rows[0].estado)) {
+      return res.status(400).json({ error: 'Solo podés cancelar pedidos pendientes o a revisar' });
+    }
+    await pool.query(`UPDATE pedidos SET estado = 'rechazado', comentario_gerente = 'Cancelado por el empleado' WHERE id = $1`, [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al cancelar pedido' });
+  }
+});
+
