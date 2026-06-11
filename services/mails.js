@@ -110,6 +110,30 @@ async function mailRecordatorio({ gerente, pedido, token }) {
   });
 }
 
+async function mailAprobacionRRHH({ gerente, pedido }) {
+  await transporter.sendMail({
+    from: `Sistema de Vacaciones <${FROM}>`,
+    to: 'clientesrg@bridgetdf.com',
+    subject: `Vacaciones aprobadas — ${pedido.empleado_nombre}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto">
+        <h2 style="color:#16a34a">Vacaciones aprobadas ✓</h2>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Empleado</td><td style="padding:8px">${pedido.empleado_nombre}</td></tr>
+          <tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Empresa</td><td style="padding:8px">${pedido.empresa_nombre || ''}</td></tr>
+          <tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Aprobado por</td><td style="padding:8px">${gerente.nombre}</td></tr>
+          <tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Desde</td><td style="padding:8px">${formatFecha(pedido.fecha_inicio)}</td></tr>
+          <tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Hasta</td><td style="padding:8px">${formatFecha(pedido.fecha_fin)}</td></tr>
+          <tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Días</td><td style="padding:8px">${pedido.dias_habiles}</td></tr>
+          ${pedido.reemplazante ? `<tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Reemplazante</td><td style="padding:8px">${pedido.reemplazante}</td></tr>` : ''}
+          ${pedido.comentario_gerente ? `<tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Comentario</td><td style="padding:8px">${pedido.comentario_gerente}</td></tr>` : ''}
+          <tr><td style="padding:8px;background:#DCFCE7;font-weight:bold">Fecha de aprobación</td><td style="padding:8px">${formatFecha(new Date().toISOString())}</td></tr>
+        </table>
+      </div>
+    `
+  });
+}
+
 async function mailPedidoEditado({ gerente, pedido, token }) {
   const link = `${FRONTEND}/aprobar/${token}`;
   await transporter.sendMail({
@@ -132,4 +156,4 @@ async function mailPedidoEditado({ gerente, pedido, token }) {
   });
 }
 
-module.exports = { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado, mailRecordatorio, mailPedidoEditado };
+module.exports = { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado, mailRecordatorio, mailPedidoEditado, mailAprobacionRRHH };

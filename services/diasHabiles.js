@@ -1,23 +1,9 @@
-const pool = require('../db');
-
-// Días hábiles = excluye domingos y feriados. Sábados cuentan.
-async function calcularDiasHabiles(fechaInicio, fechaFin) {
-  const feriados = await pool.query('SELECT fecha FROM feriados');
-  const feriadoSet = new Set(feriados.rows.map(r => r.fecha.toISOString().split('T')[0]));
-
-  let dias = 0;
-  const current = new Date(fechaInicio);
+// Días calendario = simplemente cuenta todos los días entre inicio y fin inclusive
+function calcularDiasHabiles(fechaInicio, fechaFin) {
+  const inicio = new Date(fechaInicio);
   const fin = new Date(fechaFin);
-
-  while (current <= fin) {
-    const dow = current.getDay(); // 0=domingo, 6=sábado
-    const fechaStr = current.toISOString().split('T')[0];
-    if (dow !== 0 && !feriadoSet.has(fechaStr)) {
-      dias++;
-    }
-    current.setDate(current.getDate() + 1);
-  }
-  return dias;
+  const diff = Math.round((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
+  return Promise.resolve(diff > 0 ? diff : 0);
 }
 
 module.exports = { calcularDiasHabiles };
