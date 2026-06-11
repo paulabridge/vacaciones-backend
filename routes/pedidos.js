@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const crypto = require('crypto');
 const { calcularDiasHabiles } = require('../services/diasHabiles');
-const { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado, mailPedidoEditado } = require('../services/mails');
+const { mailNuevoPedidoGerente, mailConfirmacionEmpleado, mailResolucionEmpleado, mailPedidoEditado, mailAprobacionRRHH } = require('../services/mails');
 const { authMiddleware } = require('../middleware/auth');
 
 // Crear pedido (sin login)
@@ -146,6 +146,12 @@ router.post('/:id/resolver', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Pedido no encontrado' });
     const pedido = rows[0];
     mailResolucionEmpleado({ pedido, estado }).catch(console.error);
+    if (estado === 'aprobado') {
+      const ger = await pool.query('SELECT nombre FROM gerentes WHERE id=$1', [gerente_resolver_id]);
+      const emp = await pool.query('SELECT e.nombre as empresa_nombre FROM pedidos p JOIN empresas e ON p.empresa_id=e.id WHERE p.id=$1', [id]);
+      pedido.empresa_nombre = emp.rows[0]?.empresa_nombre;
+      mailAprobacionRRHH({ gerente: ger.rows[0], pedido }).catch(console.error);
+    }
     res.json({ ok: true });
   } catch (e) {
     console.error(e);
