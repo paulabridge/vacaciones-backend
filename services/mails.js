@@ -4,7 +4,9 @@ const FROM = process.env.EMAIL_FROM || 'super@bridgetdf.com';
 const FRONTEND = process.env.FRONTEND_URL || 'https://vacaciones-bridge.netlify.app';
 
 function formatFecha(fecha) {
-  return new Date(fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const d = new Date(fecha);
+  const local = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+  return local.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 async function sendMail({ to, subject, html }) {
