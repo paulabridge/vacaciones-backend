@@ -4,7 +4,13 @@ const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+app.use(cors({ 
+  origin: [
+    'https://vacaciones.bridgetdf.com',
+    'https://vacaciones-bridge.netlify.app',
+    process.env.FRONTEND_URL
+  ].filter(Boolean)
+}));
 app.use(express.json());
 
 const authRoutes = require('./routes/auth');
